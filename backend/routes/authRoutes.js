@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { auth } from "../middleware/auth.js";
-import { sendWelcomeEmail, sendOTPEmail } from "../services/emailService.js";
+import { sendWelcomeEmail, sendOTPEmail, sendPasswordReminderEmail } from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -24,6 +24,7 @@ router.post("/google", async (req, res) => {
 
     // Find or create user
     let user = await User.findOne({ email });
+    let isNewUser = false;
 
     if (!user) {
       // New user - create account
@@ -34,9 +35,12 @@ router.post("/google", async (req, res) => {
         password: hashedPassword,
         role: role || "student",
         googleId,
+        hasSetPassword: false, // Google user hasn't set custom password yet
         bio: "",
         skills: [],
       });
+
+      isNewUser = true;
 
       // Send welcome email (non-blocking)
       sendWelcomeEmail(email, user.name).catch(err =>
@@ -47,6 +51,22 @@ router.post("/google", async (req, res) => {
       if (!user.googleId) {
         user.googleId = googleId;
         await user.save();
+      }
+
+      // Check if user needs password reminder (Google user without password)
+      if (user.googleId && !user.hasSetPassword) {
+        const daysSinceReminder = user.passwordReminderSent 
+          ? (Date.now() - user.passwordReminderSent.getTime()) / (1000 * 60 * 60 * 24)
+          : 999;
+
+        // Send reminder if not sent in last 7 days
+        if (daysSinceReminder > 7) {
+          sendPasswordReminderEmail(email, user.name).catch(err =>
+            console.error("Password reminder email failed:", err.message)
+          );
+          user.passwordReminderSent = new Date();
+          await user.save();
+        }
       }
     }
 
@@ -59,7 +79,14 @@ router.post("/google", async (req, res) => {
     res.json({
       message: "Google login successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role,
+        hasSetPassword: user.hasSetPassword,
+        isNewUser
+      },
     });
   } catch (err) {
     console.error("Google login error:", err.message);
@@ -274,6 +301,79 @@ router.post("/reset-password", async (req, res) => {
     res.json({ message: "Password reset successfully. You can now login." });
   } catch (err) {
     console.error("Reset password error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * POST /api/auth/set-password
+ * Set password for Google users (requires authentication)
+ */
+router.post("/set-password", auth, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+
+    if (!newPassword) {
+      return res.status(400).json({ message: "New password is required." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Hash and set password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.hasSetPassword = true;
+    await user.save();
+
+    res.json({ message: "Password set successfully. You can now login with email and password." });
+  } catch (err) {
+    console.error("Set password error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * PUT /api/auth/update-profile
+ * Update user profile (requires authentication)
+ */
+router.put("/update-profile", auth, async (req, res) => {
+  try {
+    const { name, bio, skills } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (bio !== undefined) user.bio = bio;
+    if (Array.isArray(skills)) user.skills = skills;
+
+    await user.save();
+
+    res.json({ 
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        bio: user.bio,
+        skills: user.skills,
+        hasSetPassword: user.hasSetPassword,
+        googleId: user.googleId
+      }
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

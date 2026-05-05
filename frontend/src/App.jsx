@@ -19,6 +19,7 @@ import Chat from "./pages/Chat.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
 import Achievements from "./pages/Achievements.jsx";
 import Certificates from "./pages/Certificates.jsx";
+import Profile from "./pages/Profile.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import AdminRoute from "./routes/AdminRoute.jsx";
 import Home from "./pages/Home.jsx";
@@ -68,6 +69,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <Certificates />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

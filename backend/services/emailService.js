@@ -152,3 +152,82 @@ export const sendOTPEmail = async (to, otp) => {
 
   await transporter.sendMail(mailOptions);
 };
+
+// Password reminder email for Google users
+export const sendPasswordReminderEmail = async (to, userName) => {
+  const mailOptions = {
+    from: `"SkillSwap" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: "🔐 Set Your Password - SkillSwap",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;">
+        <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+          
+          <!-- Header -->
+          <div style="text-align:center;margin-bottom:32px;">
+            <span style="font-size:22px;font-weight:800;color:#fff;">Skill<span style="color:#34d399;">Swap</span></span>
+          </div>
+
+          <!-- Card -->
+          <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;overflow:hidden;">
+            <div style="height:4px;background:linear-gradient(90deg,#34d399,#38bdf8,#6366f1);"></div>
+            <div style="padding:40px 36px;">
+              
+              <div style="font-size:48px;text-align:center;margin-bottom:16px;">🔐</div>
+              <h2 style="color:#f8fafc;font-size:24px;font-weight:700;margin:0 0 8px;text-align:center;">Secure Your Account</h2>
+              <p style="color:#94a3b8;font-size:14px;margin:0 0 28px;text-align:center;">Hi ${userName}, set a password for extra security!</p>
+
+              <!-- Highlight Box -->
+              <div style="background:#fbbf2420;border-left:4px solid #fbbf24;padding:16px;border-radius:8px;margin:0 0 24px;">
+                <p style="color:#fbbf24;font-size:13px;font-weight:600;margin:0 0 4px;">💡 Pro Tip</p>
+                <p style="color:#cbd5e1;font-size:13px;margin:0;">Set a password to access your account even without Google!</p>
+              </div>
+
+              <!-- Benefits -->
+              <p style="color:#cbd5e1;font-size:14px;font-weight:600;margin:0 0 12px;">Why set a password?</p>
+              <div style="margin:0 0 24px;">
+                <div style="display:flex;align-items:start;gap:8px;margin-bottom:8px;">
+                  <span style="color:#34d399;font-size:16px;">✅</span>
+                  <p style="color:#94a3b8;font-size:13px;margin:0;">Login with email & password anytime</p>
+                </div>
+                <div style="display:flex;align-items:start;gap:8px;margin-bottom:8px;">
+                  <span style="color:#34d399;font-size:16px;">✅</span>
+                  <p style="color:#94a3b8;font-size:13px;margin:0;">Access your account from any device</p>
+                </div>
+                <div style="display:flex;align-items:start;gap:8px;margin-bottom:8px;">
+                  <span style="color:#34d399;font-size:16px;">✅</span>
+                  <p style="color:#94a3b8;font-size:13px;margin:0;">Extra security for your account</p>
+                </div>
+                <div style="display:flex;align-items:start;gap:8px;">
+                  <span style="color:#34d399;font-size:16px;">✅</span>
+                  <p style="color:#94a3b8;font-size:13px;margin:0;">No dependency on Google login</p>
+                </div>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align:center;">
+                <a href="${process.env.FRONTEND_URL || 'https://skillswap-a3re.onrender.com'}/profile" 
+                   style="display:inline-block;background:linear-gradient(135deg,#34d399,#38bdf8);color:#0f172a;font-weight:700;font-size:15px;padding:14px 36px;border-radius:12px;text-decoration:none;letter-spacing:0.3px;">
+                  Set Password Now →
+                </a>
+              </div>
+
+              <p style="color:#64748b;font-size:12px;margin:28px 0 0;text-align:center;">
+                You can continue using Google Sign-In as usual. This is optional.
+              </p>
+            </div>
+          </div>
+
+          <div style="text-align:center;margin-top:24px;">
+            <p style="color:#475569;font-size:12px;">© 2025 SkillSwap</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+};

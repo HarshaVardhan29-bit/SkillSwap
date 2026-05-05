@@ -23,6 +23,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    hasSetPassword: {
+      type: Boolean,
+      default: false, // Track if Google user has set a password
+    },
+    passwordReminderSent: {
+      type: Date,
+      default: null, // Track when reminder email was sent
+    },
     role: {
       type: String,
       enum: ["student", "teacher", "admin"],

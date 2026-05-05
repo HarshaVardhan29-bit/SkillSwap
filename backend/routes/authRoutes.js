@@ -326,6 +326,11 @@ router.post("/set-password", auth, async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
 
+    // Only allow if user doesn't have a password yet (Google users)
+    if (user.hasSetPassword) {
+      return res.status(400).json({ message: "Use change password to update your existing password." });
+    }
+
     // Hash and set password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
@@ -335,6 +340,130 @@ router.post("/set-password", auth, async (req, res) => {
     res.json({ message: "Password set successfully. You can now login with email and password." });
   } catch (err) {
     console.error("Set password error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * POST /api/auth/change-password
+ * Change password (requires current password)
+ */
+router.post("/change-password", auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect." });
+    }
+
+    // Check if new password is same as current
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: "New password must be different from current password." });
+    }
+
+    // Hash and update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.hasSetPassword = true;
+    await user.save();
+
+    res.json({ message: "Password changed successfully." });
+  } catch (err) {
+    console.error("Change password error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * POST /api/auth/request-password-reset-otp
+ * Request OTP for password reset (for logged-in users who forgot password)
+ */
+router.post("/request-password-reset-otp", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    // Store OTP
+    otpStore.set(user.email, { otp, expiresAt, purpose: 'profile-reset' });
+
+    // Send OTP email
+    await sendOTPEmail(user.email, otp);
+
+    res.json({ message: "OTP sent to your email address." });
+  } catch (err) {
+    console.error("Request password reset OTP error:", err);
+    res.status(500).json({ message: "Failed to send OTP. Please try again." });
+  }
+});
+
+/**
+ * POST /api/auth/verify-otp-and-reset
+ * Verify OTP and reset password (for logged-in users)
+ */
+router.post("/verify-otp-and-reset", auth, async (req, res) => {
+  try {
+    const { otp, newPassword } = req.body;
+
+    if (!otp || !newPassword) {
+      return res.status(400).json({ message: "OTP and new password are required." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const stored = otpStore.get(user.email);
+    if (!stored) {
+      return res.status(400).json({ message: "OTP not found. Please request a new one." });
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      otpStore.delete(user.email);
+      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    if (stored.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP. Please try again." });
+    }
+
+    // OTP verified - update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.hasSetPassword = true;
+    await user.save();
+
+    otpStore.delete(user.email);
+
+    res.json({ message: "Password reset successfully." });
+  } catch (err) {
+    console.error("Verify OTP and reset error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

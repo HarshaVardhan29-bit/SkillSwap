@@ -16,11 +16,21 @@ const Profile = () => {
   
   // Password form
   const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  
+  // OTP form
+  const [otpData, setOtpData] = useState({
+    otp: "",
     newPassword: "",
     confirmPassword: ""
   });
   
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showOTPForm, setShowOTPForm] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [skillInput, setSkillInput] = useState("");
 
   useEffect(() => {
@@ -72,6 +82,7 @@ const Profile = () => {
     setMessage({ type: "", text: "" });
 
     try {
+      // For first-time password setup (Google users)
       await api.post("/auth/set-password", { newPassword: passwordData.newPassword });
       
       // Refresh user data
@@ -79,12 +90,105 @@ const Profile = () => {
       await login(localStorage.getItem("token"), userRes.data);
       
       setMessage({ type: "success", text: "Password set successfully! You can now login with email and password." });
-      setPasswordData({ newPassword: "", confirmPassword: "" });
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setShowPasswordForm(false);
     } catch (err) {
       setMessage({ 
         type: "error", 
         text: err.response?.data?.message || "Failed to set password" 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setMessage({ type: "error", text: "Passwords do not match" });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setMessage({ type: "error", text: "Password must be at least 6 characters" });
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      await api.post("/auth/change-password", { 
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword 
+      });
+      
+      setMessage({ type: "success", text: "Password changed successfully!" });
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setShowPasswordForm(false);
+    } catch (err) {
+      setMessage({ 
+        type: "error", 
+        text: err.response?.data?.message || "Failed to change password" 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestOTP = async () => {
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      await api.post("/auth/request-password-reset-otp");
+      setOtpSent(true);
+      setMessage({ type: "success", text: "OTP sent to your email! Check your inbox." });
+    } catch (err) {
+      setMessage({ 
+        type: "error", 
+        text: err.response?.data?.message || "Failed to send OTP" 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOTPReset = async (e) => {
+    e.preventDefault();
+    
+    if (otpData.newPassword !== otpData.confirmPassword) {
+      setMessage({ type: "error", text: "Passwords do not match" });
+      return;
+    }
+
+    if (otpData.newPassword.length < 6) {
+      setMessage({ type: "error", text: "Password must be at least 6 characters" });
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      await api.post("/auth/verify-otp-and-reset", { 
+        otp: otpData.otp,
+        newPassword: otpData.newPassword 
+      });
+      
+      // Refresh user data
+      const userRes = await api.get("/auth/me");
+      await login(localStorage.getItem("token"), userRes.data);
+      
+      setMessage({ type: "success", text: "Password reset successfully!" });
+      setOtpData({ otp: "", newPassword: "", confirmPassword: "" });
+      setShowOTPForm(false);
+      setOtpSent(false);
+    } catch (err) {
+      setMessage({ 
+        type: "error", 
+        text: err.response?.data?.message || "Failed to reset password" 
       });
     } finally {
       setLoading(false);
@@ -315,13 +419,30 @@ const Profile = () => {
             </div>
 
             {/* Password Section */}
-            {(showPasswordForm || user.hasSetPassword) && (
+            {(showPasswordForm || user.hasSetPassword) && !showOTPForm && (
               <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   {user.hasSetPassword ? "Change Password" : "Set Password"}
                 </h3>
                 
-                <form onSubmit={handlePasswordSet} className="space-y-4">
+                <form onSubmit={user.hasSetPassword ? handlePasswordChange : handlePasswordSet} className="space-y-4">
+                  {/* Current Password (only if user has password) */}
+                  {user.hasSetPassword && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                        placeholder="Enter current password"
+                        required
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
                       New Password
@@ -352,13 +473,13 @@ const Profile = () => {
                     />
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       type="submit"
                       disabled={loading}
                       className="flex-1 px-4 py-3 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {loading ? "Setting..." : user.hasSetPassword ? "Update Password" : "Set Password"}
+                      {loading ? "Updating..." : user.hasSetPassword ? "Update Password" : "Set Password"}
                     </button>
                     {!user.hasSetPassword && (
                       <button
@@ -370,7 +491,139 @@ const Profile = () => {
                       </button>
                     )}
                   </div>
+
+                  {/* Forgot Password Link (only if user has password) */}
+                  {user.hasSetPassword && (
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPasswordForm(false);
+                          setShowOTPForm(true);
+                        }}
+                        className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        Forgot your password? Reset with OTP
+                      </button>
+                    </div>
+                  )}
                 </form>
+              </div>
+            )}
+
+            {/* OTP Reset Form */}
+            {showOTPForm && (
+              <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Reset Password with OTP
+                </h3>
+                
+                {!otpSent ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-400">
+                      We'll send a one-time password (OTP) to your email address. Use it to reset your password.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleRequestOTP}
+                        disabled={loading}
+                        className="flex-1 px-4 py-3 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? "Sending..." : "Send OTP to Email"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowOTPForm(false);
+                          setShowPasswordForm(true);
+                        }}
+                        className="px-4 py-3 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleOTPReset} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Enter OTP
+                      </label>
+                      <input
+                        type="text"
+                        value={otpData.otp}
+                        onChange={(e) => setOtpData({ ...otpData, otp: e.target.value })}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-center text-2xl tracking-widest font-mono focus:outline-none focus:border-emerald-500 transition-colors"
+                        placeholder="000000"
+                        required
+                        maxLength={6}
+                        pattern="[0-9]{6}"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Check your email for the 6-digit code</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        New Password
+                      </label>
+                      <input
+                        type="password"
+                        value={otpData.newPassword}
+                        onChange={(e) => setOtpData({ ...otpData, newPassword: e.target.value })}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                        placeholder="Enter new password"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        value={otpData.confirmPassword}
+                        onChange={(e) => setOtpData({ ...otpData, confirmPassword: e.target.value })}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                        placeholder="Confirm new password"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 px-4 py-3 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? "Resetting..." : "Reset Password"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOTPForm(false);
+                          setOtpSent(false);
+                          setOtpData({ otp: "", newPassword: "", confirmPassword: "" });
+                        }}
+                        className="px-4 py-3 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={handleRequestOTP}
+                        disabled={loading}
+                        className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-50"
+                      >
+                        Didn't receive OTP? Resend
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
           </div>

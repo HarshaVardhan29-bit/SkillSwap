@@ -1,5 +1,9 @@
-import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { getRedirectResult } from "firebase/auth";
+import { auth } from "./firebase";
+import { useAuth } from "./context/AuthContext";
+import api from "./api/axios";
 import Navbar from "./components/Navbar.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
@@ -29,10 +33,45 @@ import Announcements from "./pages/admin/Announcements.jsx";
 import FeatureSettings from "./pages/admin/FeatureSettings.jsx";
 
 const App = () => {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  // Handle Google redirect result globally (for mobile)
+  useEffect(() => {
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          const { displayName, email, uid } = result.user;
+          // Check both sessionStorage and localStorage for role
+          const role = sessionStorage.getItem("googleLoginRole") || 
+                      localStorage.getItem("googleLoginRole") || 
+                      "student";
+          // Clean up stored role
+          sessionStorage.removeItem("googleLoginRole");
+          localStorage.removeItem("googleLoginRole");
+
+          const res = await api.post("/auth/google", {
+            name: displayName,
+            email,
+            googleId: uid,
+            role,
+          });
+          await login(res.data.token, res.data.user);
+          navigate("/dashboard");
+        }
+      } catch (err) {
+        if (err.code && err.code !== "auth/no-current-user") {
+          console.error("Redirect result error:", err.code, err.message);
+        }
+      }
+    };
+    handleRedirect();
+  }, []);
+
   return (
     <>
-      <Navbar />
-      <Routes>
+      <Navbar />      <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

@@ -11,13 +11,13 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const processGoogleUser = async (user) => {
+  const processGoogleUser = async (user, userRole) => {
     const { displayName, email, uid } = user;
     const res = await api.post("/auth/google", {
       name: displayName,
       email,
       googleId: uid,
-      role,
+      role: userRole || role,
     });
     await login(res.data.token, res.data.user);
     navigate("/dashboard");
@@ -30,7 +30,15 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
         setLoading(true);
         const result = await getRedirectResult(auth);
         if (result?.user) {
-          await processGoogleUser(result.user);
+          // Retrieve the stored role from sessionStorage or localStorage
+          const storedRole = sessionStorage.getItem("googleLoginRole") || 
+                            localStorage.getItem("googleLoginRole") || 
+                            role;
+          // Clean up stored role
+          sessionStorage.removeItem("googleLoginRole");
+          localStorage.removeItem("googleLoginRole");
+          
+          await processGoogleUser(result.user, storedRole);
         }
       } catch (err) {
         if (err.code && err.code !== "auth/no-current-user") {
@@ -48,14 +56,16 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
     setError("");
     try {
       if (isMobileBrowser()) {
-        // Store role in sessionStorage so we can use it after redirect
+        // Store role in both sessionStorage and localStorage as fallback
+        // Some mobile browsers clear sessionStorage during redirect
         sessionStorage.setItem("googleLoginRole", role);
+        localStorage.setItem("googleLoginRole", role);
         await signInWithRedirect(auth, googleProvider);
         // Page will redirect - execution stops here
       } else {
         // Desktop: use popup
         const result = await signInWithPopup(auth, googleProvider);
-        await processGoogleUser(result.user);
+        await processGoogleUser(result.user, role);
       }
     } catch (err) {
       console.error("Google login error:", err);

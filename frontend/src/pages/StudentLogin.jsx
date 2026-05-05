@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import GoogleLoginButton from "../components/GoogleLoginButton";
 
 const StudentLogin = () => {
   const navigate = useNavigate();
@@ -98,6 +99,16 @@ const StudentLogin = () => {
               Login as Student
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-slate-700" />
+            <span className="text-xs text-slate-500">or</span>
+            <div className="flex-1 h-px bg-slate-700" />
+          </div>
+
+          {/* Google Login */}
+          <GoogleLoginButton role="student" label="Continue with Google" />
 
           <p className="mt-4 text-[11px] text-center text-slate-400">
             New student?{" "}

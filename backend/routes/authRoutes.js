@@ -11,6 +11,62 @@ const router = express.Router();
 const otpStore = new Map();
 
 /**
+ * POST /api/auth/google
+ * Google Firebase login
+ */
+router.post("/google", async (req, res) => {
+  try {
+    const { name, email, googleId, role } = req.body;
+
+    if (!email || !googleId) {
+      return res.status(400).json({ message: "Invalid Google credentials." });
+    }
+
+    // Find or create user
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // New user - create account
+      user = await User.create({
+        name: name || email.split("@")[0],
+        email,
+        password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        role: role || "student",
+        googleId,
+        bio: "",
+        skills: [],
+      });
+
+      // Send welcome email (non-blocking)
+      sendWelcomeEmail(email, user.name).catch(err =>
+        console.error("Welcome email failed:", err.message)
+      );
+    } else {
+      // Existing user - update googleId if not set
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "Google login successful",
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (err) {
+    console.error("Google login error:", err);
+    res.status(500).json({ message: "Server error during Google login." });
+  }
+});
+
+/**
  * POST /api/auth/register
  */
 router.post("/register", async (req, res) => {

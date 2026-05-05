@@ -19,12 +19,57 @@ import sessionRoutes from "./routes/sessionRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import ratingRoutes from "./routes/ratingRoutes.js";
 // import Message from "./models/Message.js"; // optional if you create it
+import User from "./models/User.js";
+import Settings from "./models/Settings.js";
+import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
 connectDB();
+
+// Auto-initialize admin and settings on startup
+const autoInitialize = async () => {
+  try {
+    // Create admin if not exists
+    const adminExists = await User.findOne({ role: "admin" });
+    if (!adminExists) {
+      const hashedPassword = await bcrypt.hash("admin123", 10);
+      await User.create({
+        name: "Admin User",
+        email: "admin@skillswap.com",
+        password: hashedPassword,
+        role: "admin",
+        bio: "System Administrator",
+        skills: ["Platform Management"]
+      });
+      console.log("✅ Admin user created: admin@skillswap.com / admin123");
+    }
+
+    // Create default feature settings
+    const defaultFeatures = [
+      { featureName: "certificateGeneration", enabled: true, description: "Enable certificate generation" },
+      { featureName: "leaderboard", enabled: true, description: "Show leaderboard and rankings" },
+      { featureName: "sessionCreation", enabled: true, description: "Allow users to create sessions" },
+      { featureName: "matchingFeature", enabled: true, description: "Enable mentor-student matching" },
+      { featureName: "chatSystem", enabled: true, description: "Enable real-time chat" },
+      { featureName: "feedbackSystem", enabled: true, description: "Allow feedback" }
+    ];
+
+    for (const feature of defaultFeatures) {
+      const exists = await Settings.findOne({ featureName: feature.featureName });
+      if (!exists) await Settings.create(feature);
+    }
+
+    console.log("✅ Auto-initialization complete!");
+  } catch (err) {
+    console.error("Auto-init error:", err.message);
+  }
+};
+
+// Run after DB connects
+setTimeout(autoInitialize, 3000);
 
 const app = express();
 

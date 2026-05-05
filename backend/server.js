@@ -32,11 +32,11 @@ const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow localhost for development and production domains
       const allowedOrigins = [
-        /^http:\/\/localhost/,           // any localhost port
-        /\.vercel\.app$/,                // Vercel deployments
-        /\.onrender\.com$/,              // Render deployments
+        /^http:\/\/localhost/,
+        /\.vercel\.app$/,
+        /\.onrender\.com$/,
+        /skillswap-a3re\.onrender\.com/,
       ];
 
       if (!origin || allowedOrigins.some(pattern => pattern.test(origin))) {

@@ -151,15 +151,18 @@ const Profile = () => {
       });
       console.log("OTP Response:", response.data);
       
+      // ALWAYS show the OTP form after successful request
       setOtpSent(true);
       
       // If OTP is included in response (email failed), show it prominently
       if (response.data.otp) {
+        console.log("✅ OTP received in response:", response.data.otp);
         setMessage({ 
           type: "warning", 
           text: `Email service is temporarily unavailable. Your OTP is: ${response.data.otp}. This code expires in 10 minutes.`
         });
       } else {
+        console.log("✅ OTP sent to email");
         setMessage({ 
           type: "success", 
           text: "OTP sent to your email! Check your inbox (and spam folder)." 
@@ -172,6 +175,7 @@ const Profile = () => {
         type: "error", 
         text: `${errorMsg}. Please try again or contact support.`
       });
+      setOtpSent(false); // Don't show OTP form if request failed
     } finally {
       setLoading(false);
     }
@@ -600,10 +604,33 @@ const Profile = () => {
                         </div>
                         <div className="bg-slate-900 border border-yellow-500/30 rounded-lg p-4 text-center">
                           <p className="text-xs text-slate-400 mb-2">YOUR OTP CODE</p>
-                          <p className="text-yellow-300 text-4xl font-bold font-mono tracking-widest">
+                          <p className="text-yellow-300 text-4xl font-bold font-mono tracking-widest select-all">
                             {message.text.match(/\d{6}/)?.[0] || ""}
                           </p>
                           <p className="text-xs text-slate-500 mt-2">Expires in 10 minutes</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const otpCode = message.text.match(/\d{6}/)?.[0];
+                              if (otpCode) {
+                                navigator.clipboard.writeText(otpCode);
+                                alert("OTP copied to clipboard!");
+                              }
+                            }}
+                            className="mt-3 text-xs px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded hover:bg-yellow-500/30 transition-colors"
+                          >
+                            📋 Copy OTP
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Success message for email sent */}
+                    {message.type === "success" && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">✅</span>
+                          <p className="text-emerald-300 text-sm">{message.text}</p>
                         </div>
                       </div>
                     )}

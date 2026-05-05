@@ -14,4 +14,5 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
+// Always use popup - works on both desktop and mobile
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);

@@ -108,6 +108,11 @@ const TeacherLogin = () => {
               Create an account
             </Link>
           </p>
+          <p className="mt-2 text-[11px] text-center">
+            <Link to="/forgot-password" className="text-slate-500 hover:text-slate-300 text-[11px] transition-colors">
+              Forgot password?
+            </Link>
+          </p>
           <p className="mt-2 text-[11px] text-center text-slate-400">
             Are you a student?{" "}
             <Link

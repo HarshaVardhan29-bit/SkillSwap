@@ -37,12 +37,6 @@ const Login = () => {
             >
               Login as Teacher
             </Link>
-            <Link
-              to="/login/admin"
-              className="block w-full bg-red-500 hover:bg-red-400 text-white text-sm font-medium py-3 rounded-lg transition shadow-lg shadow-red-500/30 text-center"
-            >
-              Login as Admin
-            </Link>
           </div>
 
           <p className="mt-4 text-[11px] text-center text-slate-400">

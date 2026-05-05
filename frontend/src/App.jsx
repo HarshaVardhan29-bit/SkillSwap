@@ -8,6 +8,7 @@ import TeacherLogin from "./pages/TeacherLogin.jsx";
 import AdminLogin from "./pages/AdminLogin.jsx";
 import StudentRegister from "./pages/StudentRegister.jsx";
 import TeacherRegister from "./pages/TeacherRegister.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
 import Sessions from "./pages/Sessions.jsx";
 import SessionDetail from "./pages/SessionDetail.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -40,6 +41,7 @@ const App = () => {
         <Route path="/login/admin" element={<AdminLogin />} />
         <Route path="/register/student" element={<StudentRegister />} />
         <Route path="/register/teacher" element={<TeacherRegister />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/sessions" element={<Sessions />} />
         <Route path="/sessions/:id" element={<SessionDetail />} />
         <Route path="/leaderboard" element={<Leaderboard />} />

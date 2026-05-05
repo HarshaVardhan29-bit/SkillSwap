@@ -113,33 +113,49 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
       console.log("📱 Device type:", isMobile() ? "Mobile" : "Desktop");
       console.log("👤 Role:", role);
 
-      if (isMobile()) {
-        // Mobile: Use redirect flow
-        console.log("📲 Using redirect flow for mobile");
-        
-        // Store role in multiple places for redundancy
-        sessionStorage.setItem("googleLoginRole", role);
-        localStorage.setItem("googleLoginRole", role);
-        
-        // Also add to URL as fallback
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set("role", role);
-        window.history.replaceState({}, "", currentUrl);
-
-        console.log("💾 Role stored, initiating redirect...");
-        
-        // Initiate redirect
-        await signInWithRedirect(auth, googleProvider);
-        
-        // Note: Code after this won't execute as page redirects
-      } else {
-        // Desktop: Use popup flow
-        console.log("🖥️ Using popup flow for desktop");
-        
+      // Try popup first (works on most modern mobile browsers)
+      console.log("🔄 Attempting popup authentication...");
+      
+      try {
         const result = await signInWithPopup(auth, googleProvider);
         console.log("✅ Popup authentication successful");
-        
         await processGoogleUser(result.user, role);
+        return; // Success, exit
+      } catch (popupErr) {
+        console.log("⚠️ Popup failed:", popupErr.code);
+        
+        // If popup was closed by user, don't fallback
+        if (popupErr.code === "auth/popup-closed-by-user") {
+          setError("Login cancelled. Please try again.");
+          setLoading(false);
+          return;
+        }
+        
+        // If popup blocked or not supported, fallback to redirect on mobile
+        if (isMobile() && (
+          popupErr.code === "auth/popup-blocked" || 
+          popupErr.code === "auth/operation-not-supported-in-this-environment"
+        )) {
+          console.log("📲 Falling back to redirect flow for mobile");
+          
+          // Store role in multiple places for redundancy
+          sessionStorage.setItem("googleLoginRole", role);
+          localStorage.setItem("googleLoginRole", role);
+          
+          // Also add to URL as fallback
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set("role", role);
+          window.history.replaceState({}, "", currentUrl);
+
+          console.log("💾 Role stored, initiating redirect...");
+          
+          // Initiate redirect
+          await signInWithRedirect(auth, googleProvider);
+          // Note: Code after this won't execute as page redirects
+        } else {
+          // Other errors, throw to outer catch
+          throw popupErr;
+        }
       }
     } catch (err) {
       console.error("❌ Google login error:", err);
@@ -152,6 +168,9 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
       } else if (err.code === "auth/cancelled-popup-request") {
         // User opened another popup, ignore this error
         console.log("ℹ️ Popup request cancelled (another popup opened)");
+      } else if (err.code === "auth/unauthorized-domain") {
+        setError("Domain not authorized. Please contact support.");
+        console.error("🚨 Unauthorized domain - need to add domain to Firebase Console");
       } else {
         setError(err.response?.data?.message || err.message || "Login failed. Please try again.");
       }

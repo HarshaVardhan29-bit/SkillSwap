@@ -17,6 +17,8 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
       const result = await signInWithGoogle();
       const { displayName, email, uid } = result.user;
 
+      console.log("Google auth success:", { displayName, email, uid });
+
       const res = await api.post("/auth/google", {
         name: displayName,
         email,
@@ -24,14 +26,21 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
         role,
       });
 
+      console.log("Backend response:", res.data);
       await login(res.data.token, res.data.user);
       navigate("/dashboard");
     } catch (err) {
-      console.error("Google login error:", err);
+      console.error("Google login error full:", err);
+      console.error("Response data:", err.response?.data);
+      console.error("Status:", err.response?.status);
       if (err.code === "auth/popup-closed-by-user") {
         setError("Login cancelled.");
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err.code) {
+        setError(`Firebase error: ${err.code}`);
       } else {
-        setError(err.response?.data?.message || "Google login failed. Try again.");
+        setError("Google login failed. Check console for details.");
       }
     } finally {
       setLoading(false);

@@ -27,10 +27,11 @@ router.post("/google", async (req, res) => {
 
     if (!user) {
       // New user - create account
+      const hashedPassword = await bcrypt.hash(googleId + (process.env.JWT_SECRET || "fallback"), 10);
       user = await User.create({
         name: name || email.split("@")[0],
         email,
-        password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        password: hashedPassword,
         role: role || "student",
         googleId,
         bio: "",
@@ -61,8 +62,9 @@ router.post("/google", async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
   } catch (err) {
-    console.error("Google login error:", err);
-    res.status(500).json({ message: "Server error during Google login." });
+    console.error("Google login error:", err.message);
+    console.error("Full error:", err);
+    res.status(500).json({ message: "Server error during Google login: " + err.message });
   }
 });
 

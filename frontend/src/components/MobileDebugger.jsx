@@ -5,6 +5,12 @@ const MobileDebugger = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // Only show debug console in development or if explicitly enabled
+    const isDev = import.meta.env.MODE === 'development';
+    const debugEnabled = localStorage.getItem('enableDebug') === 'true';
+    
+    if (!isDev && !debugEnabled) return;
+
     // Only show on mobile
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (!isMobile) return;
@@ -52,9 +58,12 @@ const MobileDebugger = () => {
     };
   }, []);
 
-  // Only render on mobile
+  // Only render on mobile and if enabled
+  const isDev = import.meta.env.MODE === 'development';
+  const debugEnabled = localStorage.getItem('enableDebug') === 'true';
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  if (!isMobile) return null;
+  
+  if (!isMobile || (!isDev && !debugEnabled)) return null;
 
   return (
     <>

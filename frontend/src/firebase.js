@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0IdcGwdjwq7VA9OLMB6l-Eqyg_Om_s-o",
@@ -14,5 +14,19 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Always use popup - works on both desktop and mobile
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+// Check if mobile browser
+export const isMobileBrowser = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+export const signInWithGoogle = async () => {
+  if (isMobileBrowser()) {
+    // Use redirect for mobile - returns null, result handled separately
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
+  // Use popup for desktop
+  return signInWithPopup(auth, googleProvider);
+};
+
+export { getRedirectResult };

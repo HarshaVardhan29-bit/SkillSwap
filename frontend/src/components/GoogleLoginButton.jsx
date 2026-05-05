@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithGoogle } from "../firebase";
+import { auth, googleProvider, isMobileBrowser } from "../firebase";
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 
@@ -10,36 +11,61 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const processGoogleUser = async (user) => {
+    const { displayName, email, uid } = user;
+    const res = await api.post("/auth/google", {
+      name: displayName,
+      email,
+      googleId: uid,
+      role,
+    });
+    await login(res.data.token, res.data.user);
+    navigate("/dashboard");
+  };
+
+  // Handle redirect result when page loads (mobile flow)
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        setLoading(true);
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          await processGoogleUser(result.user);
+        }
+      } catch (err) {
+        if (err.code && err.code !== "auth/no-current-user") {
+          setError(err.response?.data?.message || `Error: ${err.code}`);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkRedirect();
+  }, []);
+
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
     try {
-      const result = await signInWithGoogle();
-      const { displayName, email, uid } = result.user;
-
-      const res = await api.post("/auth/google", {
-        name: displayName,
-        email,
-        googleId: uid,
-        role,
-      });
-
-      await login(res.data.token, res.data.user);
-      navigate("/dashboard");
+      if (isMobileBrowser()) {
+        // Store role in sessionStorage so we can use it after redirect
+        sessionStorage.setItem("googleLoginRole", role);
+        await signInWithRedirect(auth, googleProvider);
+        // Page will redirect - execution stops here
+      } else {
+        // Desktop: use popup
+        const result = await signInWithPopup(auth, googleProvider);
+        await processGoogleUser(result.user);
+      }
     } catch (err) {
       console.error("Google login error:", err);
       if (err.code === "auth/popup-closed-by-user") {
         setError("Login cancelled.");
       } else if (err.code === "auth/popup-blocked") {
-        setError("Popup blocked. Please allow popups for this site.");
-      } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else if (err.code) {
-        setError(`Firebase error: ${err.code}`);
+        setError("Popup blocked. Please allow popups or try again.");
       } else {
-        setError("Google login failed. Try again.");
+        setError(err.response?.data?.message || `Error: ${err.code || "Unknown"}`);
       }
-    } finally {
       setLoading(false);
     }
   };

@@ -1,12 +1,27 @@
 import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Gmail App Password
-  },
-});
+// Configure email transporter based on environment
+const transporter = nodemailer.createTransport(
+  process.env.SENDGRID_API_KEY
+    ? {
+        // SendGrid configuration (recommended for production)
+        host: "smtp.sendgrid.net",
+        port: 587,
+        secure: false, // Use TLS
+        auth: {
+          user: "apikey",
+          pass: process.env.SENDGRID_API_KEY,
+        },
+      }
+    : {
+        // Gmail configuration (fallback for development)
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS, // Gmail App Password
+        },
+      }
+);
 
 // Welcome email for new users
 export const sendWelcomeEmail = async (to, name) => {

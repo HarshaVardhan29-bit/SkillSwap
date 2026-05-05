@@ -416,15 +416,30 @@ router.post("/request-password-reset-otp", auth, async (req, res) => {
     otpStore.set(user.email, { otp, expiresAt, purpose: 'profile-reset' });
     console.log("💾 OTP stored in memory");
 
-    // Send OTP email
-    console.log("📨 Sending OTP email to:", user.email);
-    await sendOTPEmail(user.email, otp);
-    console.log("✅ OTP email sent successfully");
-
-    res.json({ message: "OTP sent to your email address." });
+    // Try to send OTP email
+    try {
+      console.log("📨 Attempting to send OTP email to:", user.email);
+      await sendOTPEmail(user.email, otp);
+      console.log("✅ OTP email sent successfully");
+      
+      res.json({ 
+        message: "OTP sent to your email address.",
+        // In development/testing, include OTP in response
+        ...(process.env.NODE_ENV !== 'production' && { otp })
+      });
+    } catch (emailError) {
+      console.error("❌ Email sending failed:", emailError.message);
+      
+      // Email failed, but OTP is still stored - return OTP in response as fallback
+      res.json({ 
+        message: "Email service temporarily unavailable. Here's your OTP:",
+        otp, // Include OTP in response when email fails
+        note: "Use this OTP to reset your password. It expires in 10 minutes."
+      });
+    }
   } catch (err) {
     console.error("❌ Request password reset OTP error:", err);
-    res.status(500).json({ message: "Failed to send OTP. Please try again." });
+    res.status(500).json({ message: "Failed to generate OTP. Please try again." });
   }
 });
 

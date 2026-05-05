@@ -5,6 +5,7 @@ import { auth } from "./firebase";
 import { useAuth } from "./context/AuthContext";
 import api from "./api/axios";
 import Navbar from "./components/Navbar.jsx";
+import MobileDebugger from "./components/MobileDebugger.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import StudentLogin from "./pages/StudentLogin.jsx";
@@ -77,6 +78,7 @@ const App = () => {
 
   return (
     <>
+      <MobileDebugger />
       <Navbar />      <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

@@ -1,9 +1,6 @@
-import React, { useEffect } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { getRedirectResult } from "firebase/auth";
-import { auth } from "./firebase";
+import { useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import api from "./api/axios";
 import Navbar from "./components/Navbar.jsx";
 import MobileDebugger from "./components/MobileDebugger.jsx";
 import Login from "./pages/Login.jsx";
@@ -34,52 +31,18 @@ import Announcements from "./pages/admin/Announcements.jsx";
 import FeatureSettings from "./pages/admin/FeatureSettings.jsx";
 
 const App = () => {
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // Handle Google redirect result globally (for mobile)
   useEffect(() => {
-    const handleRedirect = async () => {
-      try {
-        console.log("[App.jsx] Checking for redirect result...");
-        const result = await getRedirectResult(auth);
-        console.log("[App.jsx] Redirect result:", result ? "User found" : "No redirect");
-        
-        if (result?.user) {
-          const { displayName, email, uid } = result.user;
-          // Check both sessionStorage and localStorage for role
-          const role = sessionStorage.getItem("googleLoginRole") || 
-                      localStorage.getItem("googleLoginRole") || 
-                      "student";
-          console.log("[App.jsx] Processing user with role:", role);
-          
-          // Clean up stored role
-          sessionStorage.removeItem("googleLoginRole");
-          localStorage.removeItem("googleLoginRole");
-
-          const res = await api.post("/auth/google", {
-            name: displayName,
-            email,
-            googleId: uid,
-            role,
-          });
-          console.log("[App.jsx] Backend response received");
-          await login(res.data.token, res.data.user);
-          navigate("/dashboard");
-        }
-      } catch (err) {
-        if (err.code && err.code !== "auth/no-current-user") {
-          console.error("[App.jsx] Redirect result error:", err.code, err.message);
-        }
-      }
-    };
-    handleRedirect();
-  }, []);
+    console.log("🚀 App initialized");
+    console.log("👤 Current user:", user ? user.email : "Not logged in");
+  }, [user]);
 
   return (
     <>
       <MobileDebugger />
-      <Navbar />      <Routes>
+      <Navbar />
+      <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

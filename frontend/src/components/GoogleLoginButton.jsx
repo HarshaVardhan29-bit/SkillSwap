@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { auth, googleProvider, isMobileBrowser } from "../firebase";
+import { useNavigate, useLocation } from "react-router-dom";
+import { auth, googleProvider } from "../firebase";
 import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
@@ -10,90 +10,152 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
   const [error, setError] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Detect if mobile browser
+  const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Process Google user after successful authentication
   const processGoogleUser = async (user, userRole) => {
     try {
-      console.log("Processing Google user:", { email: user.email, role: userRole });
+      console.log("📝 Processing Google user:", { email: user.email, role: userRole });
+      
       const { displayName, email, uid } = user;
       const res = await api.post("/auth/google", {
         name: displayName,
         email,
         googleId: uid,
-        role: userRole || role,
+        role: userRole,
       });
-      console.log("Backend response:", res.data);
+
+      console.log("✅ Backend authentication successful");
       await login(res.data.token, res.data.user);
-      navigate("/dashboard");
+      
+      // Navigate to dashboard
+      navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error("Error processing Google user:", err);
+      console.error("❌ Error processing Google user:", err);
       throw err;
     }
   };
 
-  // Handle redirect result when page loads (mobile flow)
+  // Handle redirect result on component mount (for mobile)
   useEffect(() => {
-    const checkRedirect = async () => {
+    let isMounted = true;
+
+    const handleRedirectResult = async () => {
+      // Skip if already processing or if we have a token (already logged in)
+      if (localStorage.getItem("token")) {
+        console.log("⏭️ Already logged in, skipping redirect check");
+        return;
+      }
+
       try {
-        console.log("Checking for redirect result...");
+        console.log("🔍 Checking for redirect result...");
         setLoading(true);
-        const result = await getRedirectResult(auth);
-        console.log("Redirect result:", result ? "User found" : "No redirect");
         
+        const result = await getRedirectResult(auth);
+        
+        if (!isMounted) return;
+
         if (result?.user) {
-          // Retrieve the stored role from sessionStorage or localStorage
-          const storedRole = sessionStorage.getItem("googleLoginRole") || 
-                            localStorage.getItem("googleLoginRole") || 
-                            role;
-          console.log("Stored role:", storedRole);
+          console.log("✅ Redirect result found, user authenticated");
           
-          // Clean up stored role
+          // Get role from multiple sources (priority order)
+          const storedRole = 
+            sessionStorage.getItem("googleLoginRole") || 
+            localStorage.getItem("googleLoginRole") ||
+            new URLSearchParams(location.search).get("role") ||
+            role;
+
+          console.log("📋 Using role:", storedRole);
+
+          // Clean up storage
           sessionStorage.removeItem("googleLoginRole");
           localStorage.removeItem("googleLoginRole");
-          
+
           await processGoogleUser(result.user, storedRole);
+        } else {
+          console.log("ℹ️ No redirect result found");
         }
       } catch (err) {
-        console.error("Redirect check error:", err);
-        if (err.code && err.code !== "auth/no-current-user") {
-          setError(err.response?.data?.message || err.message || `Error: ${err.code}`);
+        console.error("❌ Redirect result error:", err);
+        
+        if (isMounted) {
+          // Only show error if it's not a "no redirect" error
+          if (err.code && !["auth/no-current-user", "auth/popup-closed-by-user"].includes(err.code)) {
+            setError(err.response?.data?.message || err.message || "Authentication failed");
+          }
         }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-    checkRedirect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
+    handleRedirectResult();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Run once on mount
+
+  // Handle Google login button click
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
+
     try {
-      console.log("Starting Google login, isMobile:", isMobileBrowser(), "role:", role);
-      
-      if (isMobileBrowser()) {
-        // Store role in both sessionStorage and localStorage as fallback
-        // Some mobile browsers clear sessionStorage during redirect
-        console.log("Mobile detected - storing role and redirecting");
+      console.log("🚀 Starting Google login...");
+      console.log("📱 Device type:", isMobile() ? "Mobile" : "Desktop");
+      console.log("👤 Role:", role);
+
+      if (isMobile()) {
+        // Mobile: Use redirect flow
+        console.log("📲 Using redirect flow for mobile");
+        
+        // Store role in multiple places for redundancy
         sessionStorage.setItem("googleLoginRole", role);
         localStorage.setItem("googleLoginRole", role);
+        
+        // Also add to URL as fallback
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set("role", role);
+        window.history.replaceState({}, "", currentUrl);
+
+        console.log("💾 Role stored, initiating redirect...");
+        
+        // Initiate redirect
         await signInWithRedirect(auth, googleProvider);
-        // Page will redirect - execution stops here
+        
+        // Note: Code after this won't execute as page redirects
       } else {
-        // Desktop: use popup
-        console.log("Desktop detected - using popup");
+        // Desktop: Use popup flow
+        console.log("🖥️ Using popup flow for desktop");
+        
         const result = await signInWithPopup(auth, googleProvider);
+        console.log("✅ Popup authentication successful");
+        
         await processGoogleUser(result.user, role);
       }
     } catch (err) {
-      console.error("Google login error:", err);
+      console.error("❌ Google login error:", err);
+      
+      // Handle specific error cases
       if (err.code === "auth/popup-closed-by-user") {
-        setError("Login cancelled.");
+        setError("Login cancelled. Please try again.");
       } else if (err.code === "auth/popup-blocked") {
-        setError("Popup blocked. Please allow popups or try again.");
+        setError("Popup blocked. Please allow popups and try again.");
+      } else if (err.code === "auth/cancelled-popup-request") {
+        // User opened another popup, ignore this error
+        console.log("ℹ️ Popup request cancelled (another popup opened)");
       } else {
-        setError(err.response?.data?.message || err.message || `Error: ${err.code || "Unknown"}`);
+        setError(err.response?.data?.message || err.message || "Login failed. Please try again.");
       }
+      
       setLoading(false);
     }
   };
@@ -129,7 +191,11 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
           )}
         </div>
       </button>
-      {error && <p className="mt-2 text-xs text-red-400 text-center">{error}</p>}
+      {error && (
+        <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <p className="text-xs text-red-400 text-center">{error}</p>
+        </div>
+      )}
     </div>
   );
 };

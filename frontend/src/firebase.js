@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, browserLocalPersistence, setPersistence } from "firebase/auth";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  browserLocalPersistence, 
+  setPersistence 
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0IdcGwdjwq7VA9OLMB6l-Eqyg_Om_s-o",
@@ -10,33 +15,32 @@ const firebaseConfig = {
   appId: "1:406467593112:web:d5dae59b04dc23f3fba1ed"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Auth
 export const auth = getAuth(app);
 
-// Set persistence to LOCAL to survive redirects on mobile
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error("Error setting persistence:", error);
-});
+// Set persistence to LOCAL (survives browser restarts and redirects)
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("✅ Firebase persistence set to LOCAL");
+  })
+  .catch((error) => {
+    console.error("❌ Error setting Firebase persistence:", error);
+  });
 
+// Configure Google Provider
 export const googleProvider = new GoogleAuthProvider();
-// Force account selection and ensure we get fresh credentials
+
+// Add custom parameters to Google provider
 googleProvider.setCustomParameters({
-  prompt: 'select_account'
+  prompt: 'select_account', // Always show account selection
+  access_type: 'online',
 });
 
-// Check if mobile browser
-export const isMobileBrowser = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
+// Add scopes if needed
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
 
-export const signInWithGoogle = async () => {
-  if (isMobileBrowser()) {
-    // Use redirect for mobile - returns null, result handled separately
-    await signInWithRedirect(auth, googleProvider);
-    return null;
-  }
-  // Use popup for desktop
-  return signInWithPopup(auth, googleProvider);
-};
-
-export { getRedirectResult };
+export default app;

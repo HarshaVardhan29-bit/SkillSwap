@@ -40,13 +40,18 @@ const App = () => {
   useEffect(() => {
     const handleRedirect = async () => {
       try {
+        console.log("[App.jsx] Checking for redirect result...");
         const result = await getRedirectResult(auth);
+        console.log("[App.jsx] Redirect result:", result ? "User found" : "No redirect");
+        
         if (result?.user) {
           const { displayName, email, uid } = result.user;
           // Check both sessionStorage and localStorage for role
           const role = sessionStorage.getItem("googleLoginRole") || 
                       localStorage.getItem("googleLoginRole") || 
                       "student";
+          console.log("[App.jsx] Processing user with role:", role);
+          
           // Clean up stored role
           sessionStorage.removeItem("googleLoginRole");
           localStorage.removeItem("googleLoginRole");
@@ -57,12 +62,13 @@ const App = () => {
             googleId: uid,
             role,
           });
+          console.log("[App.jsx] Backend response received");
           await login(res.data.token, res.data.user);
           navigate("/dashboard");
         }
       } catch (err) {
         if (err.code && err.code !== "auth/no-current-user") {
-          console.error("Redirect result error:", err.code, err.message);
+          console.error("[App.jsx] Redirect result error:", err.code, err.message);
         }
       }
     };

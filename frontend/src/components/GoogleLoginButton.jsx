@@ -12,28 +12,40 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
   const navigate = useNavigate();
 
   const processGoogleUser = async (user, userRole) => {
-    const { displayName, email, uid } = user;
-    const res = await api.post("/auth/google", {
-      name: displayName,
-      email,
-      googleId: uid,
-      role: userRole || role,
-    });
-    await login(res.data.token, res.data.user);
-    navigate("/dashboard");
+    try {
+      console.log("Processing Google user:", { email: user.email, role: userRole });
+      const { displayName, email, uid } = user;
+      const res = await api.post("/auth/google", {
+        name: displayName,
+        email,
+        googleId: uid,
+        role: userRole || role,
+      });
+      console.log("Backend response:", res.data);
+      await login(res.data.token, res.data.user);
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("Error processing Google user:", err);
+      throw err;
+    }
   };
 
   // Handle redirect result when page loads (mobile flow)
   useEffect(() => {
     const checkRedirect = async () => {
       try {
+        console.log("Checking for redirect result...");
         setLoading(true);
         const result = await getRedirectResult(auth);
+        console.log("Redirect result:", result ? "User found" : "No redirect");
+        
         if (result?.user) {
           // Retrieve the stored role from sessionStorage or localStorage
           const storedRole = sessionStorage.getItem("googleLoginRole") || 
                             localStorage.getItem("googleLoginRole") || 
                             role;
+          console.log("Stored role:", storedRole);
+          
           // Clean up stored role
           sessionStorage.removeItem("googleLoginRole");
           localStorage.removeItem("googleLoginRole");
@@ -41,29 +53,35 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
           await processGoogleUser(result.user, storedRole);
         }
       } catch (err) {
+        console.error("Redirect check error:", err);
         if (err.code && err.code !== "auth/no-current-user") {
-          setError(err.response?.data?.message || `Error: ${err.code}`);
+          setError(err.response?.data?.message || err.message || `Error: ${err.code}`);
         }
       } finally {
         setLoading(false);
       }
     };
     checkRedirect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
     try {
+      console.log("Starting Google login, isMobile:", isMobileBrowser(), "role:", role);
+      
       if (isMobileBrowser()) {
         // Store role in both sessionStorage and localStorage as fallback
         // Some mobile browsers clear sessionStorage during redirect
+        console.log("Mobile detected - storing role and redirecting");
         sessionStorage.setItem("googleLoginRole", role);
         localStorage.setItem("googleLoginRole", role);
         await signInWithRedirect(auth, googleProvider);
         // Page will redirect - execution stops here
       } else {
         // Desktop: use popup
+        console.log("Desktop detected - using popup");
         const result = await signInWithPopup(auth, googleProvider);
         await processGoogleUser(result.user, role);
       }
@@ -74,7 +92,7 @@ const GoogleLoginButton = ({ role = "student", label = "Continue with Google" })
       } else if (err.code === "auth/popup-blocked") {
         setError("Popup blocked. Please allow popups or try again.");
       } else {
-        setError(err.response?.data?.message || `Error: ${err.code || "Unknown"}`);
+        setError(err.response?.data?.message || err.message || `Error: ${err.code || "Unknown"}`);
       }
       setLoading(false);
     }

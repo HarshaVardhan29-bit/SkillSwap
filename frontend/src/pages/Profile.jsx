@@ -115,6 +115,11 @@ const Profile = () => {
       return;
     }
 
+    if (!passwordData.currentPassword) {
+      setMessage({ type: "error", text: "Please enter your current password" });
+      return;
+    }
+
     setLoading(true);
     setMessage({ type: "", text: "" });
 
@@ -128,10 +133,8 @@ const Profile = () => {
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setShowPasswordForm(false);
     } catch (err) {
-      setMessage({ 
-        type: "error", 
-        text: err.response?.data?.message || "Failed to change password" 
-      });
+      const errorMsg = err.response?.data?.message || "Failed to change password";
+      setMessage({ type: "error", text: errorMsg });
     } finally {
       setLoading(false);
     }
@@ -142,13 +145,32 @@ const Profile = () => {
     setMessage({ type: "", text: "" });
 
     try {
-      await api.post("/auth/request-password-reset-otp");
+      console.log("Requesting OTP...");
+      const response = await api.post("/auth/request-password-reset-otp", {}, {
+        timeout: 30000 // 30 second timeout
+      });
+      console.log("OTP Response:", response.data);
+      
       setOtpSent(true);
-      setMessage({ type: "success", text: "OTP sent to your email! Check your inbox." });
+      
+      // If OTP is included in response (email failed), show it prominently
+      if (response.data.otp) {
+        setMessage({ 
+          type: "warning", 
+          text: `Email service is temporarily unavailable. Your OTP is: ${response.data.otp}. This code expires in 10 minutes.`
+        });
+      } else {
+        setMessage({ 
+          type: "success", 
+          text: "OTP sent to your email! Check your inbox (and spam folder)." 
+        });
+      }
     } catch (err) {
+      console.error("OTP Request Error:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Failed to send OTP";
       setMessage({ 
         type: "error", 
-        text: err.response?.data?.message || "Failed to send OTP" 
+        text: `${errorMsg}. Please try again or contact support.`
       });
     } finally {
       setLoading(false);
@@ -236,9 +258,16 @@ const Profile = () => {
           <div className={`mb-6 p-4 rounded-xl border ${
             message.type === "success" 
               ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" 
+              : message.type === "warning"
+              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
               : "bg-red-500/10 border-red-500/30 text-red-300"
           }`}>
-            {message.text}
+            <div className="flex items-start gap-3">
+              <span className="text-xl flex-shrink-0">
+                {message.type === "success" ? "✅" : message.type === "warning" ? "⚠️" : "❌"}
+              </span>
+              <p className="flex-1">{message.text}</p>
+            </div>
           </div>
         )}
 
@@ -435,11 +464,25 @@ const Profile = () => {
                       <input
                         type="password"
                         value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                        className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                        onChange={(e) => {
+                          setPasswordData({ ...passwordData, currentPassword: e.target.value });
+                          // Clear error when user starts typing
+                          if (message.type === "error") setMessage({ type: "", text: "" });
+                        }}
+                        className={`w-full px-4 py-2 bg-slate-800 rounded-lg text-white focus:outline-none transition-all ${
+                          message.type === "error" && (message.text.toLowerCase().includes("incorrect") || message.text.toLowerCase().includes("current password"))
+                            ? "border-2 border-red-500 focus:border-red-500 ring-2 ring-red-500/20"
+                            : "border border-slate-600 focus:border-emerald-500"
+                        }`}
                         placeholder="Enter current password"
                         required
                       />
+                      {message.type === "error" && (message.text.toLowerCase().includes("incorrect") || message.text.toLowerCase().includes("current password")) && (
+                        <div className="flex items-center gap-2 mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+                          <span className="text-red-400 text-lg">❌</span>
+                          <p className="text-sm text-red-300 font-medium">{message.text}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -535,6 +578,7 @@ const Profile = () => {
                         onClick={() => {
                           setShowOTPForm(false);
                           setShowPasswordForm(true);
+                          setMessage({ type: "", text: "" });
                         }}
                         className="px-4 py-3 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors"
                       >
@@ -544,6 +588,26 @@ const Profile = () => {
                   </div>
                 ) : (
                   <form onSubmit={handleOTPReset} className="space-y-4">
+                    {/* Show OTP prominently if email failed */}
+                    {message.type === "warning" && message.text.includes("OTP is:") && (
+                      <div className="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl p-4 mb-4">
+                        <div className="flex items-start gap-3 mb-3">
+                          <span className="text-2xl">⚠️</span>
+                          <div>
+                            <p className="text-yellow-300 font-semibold text-sm mb-1">Email Service Unavailable</p>
+                            <p className="text-yellow-200/80 text-xs">Copy your OTP from below and enter it in the form:</p>
+                          </div>
+                        </div>
+                        <div className="bg-slate-900 border border-yellow-500/30 rounded-lg p-4 text-center">
+                          <p className="text-xs text-slate-400 mb-2">YOUR OTP CODE</p>
+                          <p className="text-yellow-300 text-4xl font-bold font-mono tracking-widest">
+                            {message.text.match(/\d{6}/)?.[0] || ""}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-2">Expires in 10 minutes</p>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
                         Enter OTP
@@ -551,14 +615,31 @@ const Profile = () => {
                       <input
                         type="text"
                         value={otpData.otp}
-                        onChange={(e) => setOtpData({ ...otpData, otp: e.target.value })}
-                        className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-center text-2xl tracking-widest font-mono focus:outline-none focus:border-emerald-500 transition-colors"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setOtpData({ ...otpData, otp: value });
+                          // Clear error when user starts typing
+                          if (message.type === "error") setMessage({ type: "", text: "" });
+                        }}
+                        className={`w-full px-4 py-2 bg-slate-800 rounded-lg text-white text-center text-2xl tracking-widest font-mono focus:outline-none transition-all ${
+                          message.type === "error" && (message.text.toLowerCase().includes("otp") || message.text.toLowerCase().includes("invalid"))
+                            ? "border-2 border-red-500 focus:border-red-500 ring-2 ring-red-500/20"
+                            : "border border-slate-600 focus:border-emerald-500"
+                        }`}
                         placeholder="000000"
                         required
                         maxLength={6}
-                        pattern="[0-9]{6}"
+                        inputMode="numeric"
                       />
-                      <p className="text-xs text-slate-500 mt-1">Check your email for the 6-digit code</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {message.type === "warning" ? "Enter the OTP shown above" : "Check your email for the 6-digit code"}
+                      </p>
+                      {message.type === "error" && (message.text.toLowerCase().includes("otp") || message.text.toLowerCase().includes("invalid")) && (
+                        <div className="flex items-center gap-2 mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+                          <span className="text-red-400 text-lg">❌</span>
+                          <p className="text-sm text-red-300 font-medium">{message.text}</p>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -605,6 +686,7 @@ const Profile = () => {
                           setShowOTPForm(false);
                           setOtpSent(false);
                           setOtpData({ otp: "", newPassword: "", confirmPassword: "" });
+                          setMessage({ type: "", text: "" });
                         }}
                         className="px-4 py-3 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors"
                       >

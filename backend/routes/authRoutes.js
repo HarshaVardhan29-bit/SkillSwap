@@ -396,24 +396,34 @@ router.post("/change-password", auth, async (req, res) => {
  */
 router.post("/request-password-reset-otp", auth, async (req, res) => {
   try {
+    console.log("📧 OTP Request - User ID:", req.user.id);
+    
     const user = await User.findById(req.user.id);
     if (!user) {
+      console.log("❌ User not found:", req.user.id);
       return res.status(404).json({ message: "User not found." });
     }
+
+    console.log("✅ User found:", user.email);
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
+    console.log("🔢 Generated OTP:", otp, "for", user.email);
+
     // Store OTP
     otpStore.set(user.email, { otp, expiresAt, purpose: 'profile-reset' });
+    console.log("💾 OTP stored in memory");
 
     // Send OTP email
+    console.log("📨 Sending OTP email to:", user.email);
     await sendOTPEmail(user.email, otp);
+    console.log("✅ OTP email sent successfully");
 
     res.json({ message: "OTP sent to your email address." });
   } catch (err) {
-    console.error("Request password reset OTP error:", err);
+    console.error("❌ Request password reset OTP error:", err);
     res.status(500).json({ message: "Failed to send OTP. Please try again." });
   }
 });
@@ -425,6 +435,7 @@ router.post("/request-password-reset-otp", auth, async (req, res) => {
 router.post("/verify-otp-and-reset", auth, async (req, res) => {
   try {
     const { otp, newPassword } = req.body;
+    console.log("🔐 OTP Verification - User ID:", req.user.id, "OTP:", otp);
 
     if (!otp || !newPassword) {
       return res.status(400).json({ message: "OTP and new password are required." });
@@ -436,22 +447,32 @@ router.post("/verify-otp-and-reset", auth, async (req, res) => {
 
     const user = await User.findById(req.user.id);
     if (!user) {
+      console.log("❌ User not found:", req.user.id);
       return res.status(404).json({ message: "User not found." });
     }
 
+    console.log("✅ User found:", user.email);
+
     const stored = otpStore.get(user.email);
     if (!stored) {
+      console.log("❌ OTP not found in store for:", user.email);
       return res.status(400).json({ message: "OTP not found. Please request a new one." });
     }
 
+    console.log("📋 Stored OTP:", stored.otp, "Provided OTP:", otp);
+
     if (Date.now() > stored.expiresAt) {
+      console.log("⏰ OTP expired for:", user.email);
       otpStore.delete(user.email);
       return res.status(400).json({ message: "OTP has expired. Please request a new one." });
     }
 
     if (stored.otp !== otp) {
+      console.log("❌ OTP mismatch. Expected:", stored.otp, "Got:", otp);
       return res.status(400).json({ message: "Invalid OTP. Please try again." });
     }
+
+    console.log("✅ OTP verified successfully");
 
     // OTP verified - update password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -460,10 +481,11 @@ router.post("/verify-otp-and-reset", auth, async (req, res) => {
     await user.save();
 
     otpStore.delete(user.email);
+    console.log("✅ Password reset successfully for:", user.email);
 
     res.json({ message: "Password reset successfully." });
   } catch (err) {
-    console.error("Verify OTP and reset error:", err);
+    console.error("❌ Verify OTP and reset error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

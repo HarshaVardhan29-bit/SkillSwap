@@ -3,7 +3,7 @@ services:
     name: skillswap
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && cd ../frontend && npm install && npm run build && cd ../backend
     startCommand: npm start
     envVars:
       - key: MONGO_URI

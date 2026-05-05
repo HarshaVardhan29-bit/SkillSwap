@@ -78,18 +78,18 @@ EMAIL_USER=skillswap.noreplay@gmail.com
 Update your `backend/.env` file:
 
 ```env
-MONGO_URI=mongodb+srv://skillswap_user:harsha10576@cluster0.f1hi6bb.mongodb.net/skillswap?retryWrites=true&w=majority&appName=Cluster0
-JWT_SECRET=supersecretjwtkey
+MONGO_URI=your_mongodb_connection_string_here
+JWT_SECRET=your_jwt_secret_here
 PORT=5000
 
 # SendGrid Configuration
 SENDGRID_API_KEY=SG.your_actual_api_key_here
-EMAIL_USER=skillswap.noreplay@gmail.com
+EMAIL_USER=your_email@domain.com
 
 # Keep Gmail as fallback for local development
-EMAIL_PASS=wnen tejk vxaf nzdq
+EMAIL_PASS=your_gmail_app_password_here
 
-FRONTEND_URL=https://skillswap-a3re.onrender.com
+FRONTEND_URL=https://your-app-url.com
 ```
 
 ### 6. Test Locally (Optional)

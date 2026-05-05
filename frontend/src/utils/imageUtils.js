@@ -1,4 +1,8 @@
 // Utility function to get the correct image URL
+const BACKEND_URL = import.meta.env.VITE_API_URL 
+  ? import.meta.env.VITE_API_URL.replace('/api', '') 
+  : 'http://localhost:5000';
+
 export const getImageUrl = (imageUrl) => {
   if (!imageUrl) return null;
   
@@ -9,9 +13,9 @@ export const getImageUrl = (imageUrl) => {
   
   // If it's a relative path (starts with /uploads), prepend backend URL
   if (imageUrl.startsWith('/uploads')) {
-    return `http://localhost:5000${imageUrl}`;
+    return `${BACKEND_URL}${imageUrl}`;
   }
   
   // If it's just a filename, assume it's in uploads
-  return `http://localhost:5000/uploads/${imageUrl}`;
+  return `${BACKEND_URL}/uploads/${imageUrl}`;
 };

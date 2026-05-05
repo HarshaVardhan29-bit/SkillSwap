@@ -1,10 +1,12 @@
 // frontend/src/api/axios.js
 import axios from "axios";
 
+// Use environment variable for production, fallback to localhost for development
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 // create axios instance
 const api = axios.create({
-  // change port if your backend is on a different one
-  baseURL: "http://localhost:5000/api",
+  baseURL: BASE_URL,
   withCredentials: false,
 });
 

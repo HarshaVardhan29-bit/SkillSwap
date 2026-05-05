@@ -29,12 +29,17 @@ connectDB();
 const app = express();
 
 // ---------- CORS CONFIG (Express) ----------
-// Allow ANY http://localhost:* origin (5173, 5175, 5176, etc.)
 app.use(
   cors({
     origin: (origin, callback) => {
-      // origin will be undefined for tools like Postman
-      if (!origin || origin.startsWith("http://localhost")) {
+      // Allow localhost for development and production domains
+      const allowedOrigins = [
+        /^http:\/\/localhost/,           // any localhost port
+        /\.vercel\.app$/,                // Vercel deployments
+        /\.onrender\.com$/,              // Render deployments
+      ];
+
+      if (!origin || allowedOrigins.some(pattern => pattern.test(origin))) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -65,13 +70,26 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// ---------- SERVE FRONTEND (Production) ----------
+const frontendBuild = path.join(__dirname, "../frontend/dist");
+app.use(express.static(frontendBuild));
+
+// All non-API routes serve the React app
+app.get("*", (req, res) => {
+  res.sendFile(path.join(frontendBuild, "index.html"));
+});
+
 // ---------- SOCKET.IO SETUP ----------
 const server = http.createServer(app);
 
 const io = new SocketIOServer(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || origin.startsWith("http://localhost")) {
+      const allowedOrigins = [
+        /^http:\/\/localhost/,
+        /\.onrender\.com$/,
+      ];
+      if (!origin || allowedOrigins.some(pattern => pattern.test(origin))) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
